@@ -3,7 +3,7 @@ echo 'export TERM=xterm-256color' >> ~/.bashrc
 
 # Systemd
 mkdir -p /etc/systemd/system
-cp -r ./system/* /etc/systemd/system/
+sudo cp -r ./system/* /etc/systemd/system/
 
 # Pufferpanel
 curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh?any=true | sudo bash
@@ -38,3 +38,4 @@ sudo apt install build-essential libssl-dev pkg-config cmake libclang-dev libopu
 git clone https://github.com/lucasjinreal/Kokoros
 cd Kokoros
 cargo build --release
+sudo systemctl enable --now kokoros
