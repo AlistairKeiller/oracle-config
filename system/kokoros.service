@@ -1,0 +1,11 @@
+[Unit]
+Description=Kokoros Application
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/alistair/Documents/Kokoros/target/release/koko openai
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
