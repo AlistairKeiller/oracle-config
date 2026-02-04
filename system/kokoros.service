@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/alistair/Documents/Kokoros/target/release/koko openai
+ExecStart=/home/Kokoros/target/release/koko openai
 Restart=always
 
 [Install]

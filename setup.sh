@@ -35,6 +35,7 @@ sudo apt install git
 
 # build Kokoros
 sudo apt install build-essential libssl-dev pkg-config cmake libclang-dev libopus-dev libsonic-dev libpcaudio-dev
+cd /home
 git clone https://github.com/lucasjinreal/Kokoros
 cd Kokoros
 cargo build --release
