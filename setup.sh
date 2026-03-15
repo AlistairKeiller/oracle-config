@@ -1,58 +1,76 @@
-# Getting alacritty to work
+#!/bin/bash
+set -e
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run as root (sudo ./install.sh)" >&2
+    exit 1
+fi
+
+REAL_USER="${SUDO_USER:-$(logname)}"
+REAL_HOME=$(eval echo "~$REAL_USER")
+
+echo "Clearing all kernel firewall rules"
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -P OUTPUT ACCEPT
+iptables -F
+iptables -X
+iptables -Z
+ip6tables -P INPUT ACCEPT
+ip6tables -P FORWARD ACCEPT
+ip6tables -P OUTPUT ACCEPT
+ip6tables -F
+ip6tables -X
+ip6tables -Z
+
+echo "Configuring alacritty"
 echo 'export TERM=xterm-256color' >> ~/.bashrc
 
-# Systemd
+echo "Setting up systemd"
 mkdir -p /etc/systemd/system
-sudo cp -r ./system/* /etc/systemd/system/
+cp -r ./system/* /etc/systemd/system/
 
-# Pufferpanel
-curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh?any=true | sudo bash
-sudo apt update
-sudo apt-get install pufferpanel
-sudo pufferpanel user add
-sudo systemctl enable --now pufferpanel
+echo "Installing Pufferpanel"
+curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh?any=true | bash
+apt update
+apt-get install pufferpanel
+pufferpanel user add
+systemctl enable --now pufferpanel
 
-# Clear all kernel firewall rules
-sudo iptables -P INPUT ACCEPT
-sudo iptables -P FORWARD ACCEPT
-sudo iptables -P OUTPUT ACCEPT
-sudo iptables -F
-sudo iptables -X
-sudo iptables -Z
-sudo ip6tables -P INPUT ACCEPT
-sudo ip6tables -P FORWARD ACCEPT
-sudo ip6tables -P OUTPUT ACCEPT
-sudo ip6tables -F
-sudo ip6tables -X
-sudo ip6tables -Z
-
-# Install rust
+echo "Installing Rust"
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Install git
-sudo apt update
-sudo apt install git
+echo "Installing Git"
+apt update
+apt install git
 
-# build Kokoros
-sudo apt install build-essential libssl-dev pkg-config cmake libclang-dev libopus-dev libsonic-dev libpcaudio-dev
+echo "Building Kokoros"
+apt install build-essential libssl-dev pkg-config cmake libclang-dev libopus-dev libsonic-dev libpcaudio-dev
 cd /home
 git clone https://github.com/lucasjinreal/Kokoros
 cd Kokoros
 cargo build --release
-sudo systemctl enable --now kokoros
+systemctl enable --now kokoros
 
-# install grafana
-sudo apt-get install -y apt-transport-https wget gnupg
-sudo mkdir -p /etc/apt/keyrings
-sudo wget -O /etc/apt/keyrings/grafana.asc https://apt.grafana.com/gpg-full.key
-sudo chmod 644 /etc/apt/keyrings/grafana.asc
-echo "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
-sudo apt-get update
-sudo apt-get install grafana
-sudo systemctl enable --now grafana-server
+echo "Installing Grafana"
+apt-get install -y apt-transport-https wget gnupg
+mkdir -p /etc/apt/keyrings
+wget -O /etc/apt/keyrings/grafana.asc https://apt.grafana.com/gpg-full.key
+chmod 644 /etc/apt/keyrings/grafana.asc
+echo "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list
+apt-get update
+apt-get install grafana
+systemctl enable --now grafana-server
 
-# port map:
-# 25565: Minecraft
-# 8080: Pufferpanel
-# 3000: Grafana
-# 3001: Kokoros
+echo "Installing TDengine"
+wget https://downloads.tdengine.com/tdengine-tsdb-oss/3.4.0.9/tdengine-tsdb-oss-3.4.0.9-linux-arm64.tar.gz
+tar -zxvf tdengine-tsdb-oss-3.4.0.9-linux-arm64.tar.gz
+cd tdengine-tsdb-oss-3.4.0.9
+./install.sh
+systemctl enable --now taosd
+
+echo "Port map:"
+echo "25565: Minecraft"
+echo "8080: Pufferpanel"
+echo "3000: Grafana"
+echo "3001: Kokoros"
