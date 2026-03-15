@@ -1,76 +1,72 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Please run as root (sudo ./install.sh)" >&2
-    exit 1
+  echo "Please run as root (sudo ./install.sh)" >&2
+  exit 1
 fi
 
 REAL_USER="${SUDO_USER:-$(logname)}"
 REAL_HOME=$(eval echo "~$REAL_USER")
+ARCH=$(dpkg --print-architecture)
 
-echo "Clearing all kernel firewall rules"
-iptables -P INPUT ACCEPT
-iptables -P FORWARD ACCEPT
-iptables -P OUTPUT ACCEPT
-iptables -F
-iptables -X
-iptables -Z
-ip6tables -P INPUT ACCEPT
-ip6tables -P FORWARD ACCEPT
-ip6tables -P OUTPUT ACCEPT
-ip6tables -F
-ip6tables -X
-ip6tables -Z
+echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
+echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
 
-echo "Configuring alacritty"
-echo 'export TERM=xterm-256color' >> ~/.bashrc
+for port in 25565 8080 3000 3001; do
+  iptables -I INPUT -p tcp --dport "$port" -j ACCEPT
+  ip6tables -I INPUT -p tcp --dport "$port" -j ACCEPT
+done
 
-echo "Setting up systemd"
+netfilter-persistent save
+
+# Alacritty
+grep -q 'TERM=xterm-256color' "$REAL_HOME/.bashrc" 2>/dev/null || \
+  echo 'export TERM=xterm-256color' >> "$REAL_HOME/.bashrc"
+
+# Systemd units
 mkdir -p /etc/systemd/system
 cp -r ./system/* /etc/systemd/system/
+systemctl daemon-reload
 
-echo "Installing Pufferpanel"
+# Pufferpanel
 curl -s https://packagecloud.io/install/repositories/pufferpanel/pufferpanel/script.deb.sh?any=true | bash
-apt update
-apt-get install pufferpanel
+apt-get update -y
+apt-get install -y pufferpanel
 pufferpanel user add
 systemctl enable --now pufferpanel
 
-echo "Installing Rust"
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# Rust
+sudo -u "$REAL_USER" bash -c 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y'
 
-echo "Installing Git"
-apt update
-apt install git
+# Git + build deps
+apt-get install -y git build-essential libssl-dev pkg-config cmake libclang-dev libopus-dev libsonic-dev libpcaudio-dev
 
-echo "Building Kokoros"
-apt install build-essential libssl-dev pkg-config cmake libclang-dev libopus-dev libsonic-dev libpcaudio-dev
-cd /home
-git clone https://github.com/lucasjinreal/Kokoros
-cd Kokoros
-cargo build --release
+# Kokoros
+git clone https://github.com/lucasjinreal/Kokoros /home/Kokoros || true
+sudo -u "$REAL_USER" bash -c 'source "$HOME/.cargo/env" && cd /home/Kokoros && cargo build --release'
 systemctl enable --now kokoros
 
-echo "Installing Grafana"
+# Grafana
 apt-get install -y apt-transport-https wget gnupg
 mkdir -p /etc/apt/keyrings
-wget -O /etc/apt/keyrings/grafana.asc https://apt.grafana.com/gpg-full.key
+wget -qO /etc/apt/keyrings/grafana.asc https://apt.grafana.com/gpg-full.key
 chmod 644 /etc/apt/keyrings/grafana.asc
-echo "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" | tee -a /etc/apt/sources.list.d/grafana.list
-apt-get update
-apt-get install grafana
+echo "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main" | tee /etc/apt/sources.list.d/grafana.list
+apt-get update -y
+apt-get install -y grafana
 systemctl enable --now grafana-server
 
-echo "Installing TDengine"
-wget https://downloads.tdengine.com/tdengine-tsdb-oss/3.4.0.9/tdengine-tsdb-oss-3.4.0.9-linux-arm64.tar.gz
-tar -zxvf tdengine-tsdb-oss-3.4.0.9-linux-arm64.tar.gz
-cd tdengine-tsdb-oss-3.4.0.9
-./install.sh
+# TDengine
+TD_VER="3.4.0.9"
+wget -q "https://downloads.tdengine.com/tdengine-tsdb-oss/${TD_VER}/tdengine-tsdb-oss-${TD_VER}-linux-${ARCH}.tar.gz"
+tar -zxf "tdengine-tsdb-oss-${TD_VER}-linux-${ARCH}.tar.gz"
+cd "tdengine-tsdb-oss-${TD_VER}" && ./install.sh && cd -
+rm -rf "tdengine-tsdb-oss-${TD_VER}"*
 systemctl enable --now taosd
 
 echo "Port map:"
-echo "25565: Minecraft"
-echo "8080: Pufferpanel"
-echo "3000: Grafana"
-echo "3001: Kokoros"
+echo "  25565: Minecraft"
+echo "  8080:  Pufferpanel"
+echo "  3000:  Grafana"
+echo "  3001:  Kokoros"
