@@ -64,6 +64,10 @@ tar -zxf "tdengine-tsdb-oss-${TD_VER}-linux-${ARCH}.tar.gz"
 cd "tdengine-tsdb-oss-${TD_VER}" && ./install.sh && cd -
 rm -rf "tdengine-tsdb-oss-${TD_VER}"*
 systemctl enable --now taosd
+grafana-cli --pluginUrl \
+  https://www.tdengine.com/assets-download/grafana-plugin/tdengine-datasource.zip \
+  plugins install tdengine-datasource
+sudo systemctl restart grafana-server
 
 echo "Port map:"
 echo "  25565: Minecraft"
